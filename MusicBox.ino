@@ -5,6 +5,7 @@
 #define DEFAULT_POS 75
 
 #define TONE_HOLD 100
+#define DETACH_HOLD 50
  
 // Create the servo object to control a servo.
 Servo myservo[SERVOS];  
@@ -36,7 +37,10 @@ int offset[SERVOS] = {
   -10, 2, -2, -2, 6 
 };
 
-int servoActivationTimer[SERVOS] = {
+// int activeServos[SERVOS] = {};
+
+// At 0 the servo should be detached, 50 we should return to default
+long servoActivationTimer[SERVOS] = {
   0,0,0,0,0,
   0,0,0,0,0,
   0,0,0,0,0,
@@ -45,42 +49,56 @@ int servoActivationTimer[SERVOS] = {
   0,0,0,0,0,
   0,0,0,0,0
 };
- 
+
+
 void setup() {
    
+  setAllToAngle(75);
   for(int i = 0; i < SERVOS; i++) {
     // Attach the servo to the servo object 
     myservo[i].attach(servo_pins[i]);
-    // wait for servo to get to position before moving on to next
- 
+    // wait for servo to get to position before moving on to next 
   }
   delay(1000);
   
   
-  setAllToAngle(75);
+  for(int i = 0; i < SERVOS; i++) {
+    // Attach the servo to the servo object 
+    myservo[i].detach();
+    // wait for servo to get to position before moving on to next
+  }
+
   delay(500);
 }
   
 void loop() {
-
   for(int i = 0; i < SERVOS; i++) {
-  delay(500);
-  onTone(i);
+    delay(500);
+    onTone(i);
 
-  delay(500);
+    delay(500);
 
-  offTone(i);
+    offTone(i);
   }
  
 }      
 
+void attachAndWrite(int index, int angle){
+    myservo[index].attach(servo_pins[index]);
+    myservo[index].write(angle);
+}
+
+void detachAll() {
+  for(int i = 0; i < SERVOS; i++) {
+    myservo[i].detach();
+  }
+}
+
 void setAllToAngle(int angle) {
    for(int i = 0; i < SERVOS; i++) {
       myservo[i].write(angle + offset[i]);   
-      delay(100);     
     }           
 }
-
 
 int checkServoActivationTimer(){
   for(int i = 0; i < SERVOS; i++) {
@@ -95,6 +113,19 @@ int checkServoActivationTimer(){
   }   
 }
 
+
+// void updateServoState(){
+  
+//   unsigned long currentMillis = millis();
+
+//   activeServos
+//   for (int i=0; i<sizeof activeServos/sizeof activeServos[0]; i++) {
+//     if (currentMillis - servoActivationTimer[i] >= toneDuration) {
+
+//     }
+//   }
+// }
+
 void onTone(int index) {
   int angle = 30;
   // If the pin is over half way reverse the direction
@@ -102,10 +133,14 @@ void onTone(int index) {
     angle = angle * -1;
   }
   
-  myservo[index].write(DEFAULT_POS + angle + offset[index]);   
-  // servoActivationTimer[pin] = TONE_HOLD;
+  attachAndWrite(index, DEFAULT_POS + angle + offset[index]);
+  servoActivationTimer[index] = millis();
 }
 
 void offTone(int index) {
-  myservo[index].write(DEFAULT_POS +  offset[index]);   
+  // myservo[index].write(DEFAULT_POS +  offset[index]);   
+  
+  attachAndWrite(index, DEFAULT_POS + offset[index]);
+  delay(50);
+  myservo[index].detach();
 }
