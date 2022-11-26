@@ -4,8 +4,8 @@
 #define SERVOS 30
 #define DEFAULT_POS 75
 
-#define TONE_HOLD 100
-#define DETACH_HOLD 50
+#define TONE_HOLD 250
+#define DETACH_HOLD 500
  
 // Create the servo object to control a servo.
 Servo myservo[SERVOS];  
@@ -37,50 +37,38 @@ int offset[SERVOS] = {
   -10, 2, -2, -2, 6 
 };
 
-// int activeServos[SERVOS] = {};
+bool activeServos[SERVOS] = {false};
 
 // At 0 the servo should be detached, 50 we should return to default
-long servoActivationTimer[SERVOS] = {
-  0,0,0,0,0,
-  0,0,0,0,0,
-  0,0,0,0,0,
-
-  0,0,0,0,0,
-  0,0,0,0,0,
-  0,0,0,0,0
-};
+long servoActivationTimer[SERVOS] = {0};
 
 
 void setup() {
    
+  Serial.begin(9600);
+
+
   setAllToAngle(75);
   for(int i = 0; i < SERVOS; i++) {
     // Attach the servo to the servo object 
     myservo[i].attach(servo_pins[i]);
     // wait for servo to get to position before moving on to next 
   }
-  delay(1000);
-  
+  delay(500);
   
   for(int i = 0; i < SERVOS; i++) {
-    // Attach the servo to the servo object 
     myservo[i].detach();
-    // wait for servo to get to position before moving on to next
   }
-
   delay(500);
+  
+  Serial.println(" ==== PLAYER READY ====");
 }
   
 void loop() {
-  for(int i = 0; i < SERVOS; i++) {
-    delay(500);
-    onTone(i);
 
-    delay(500);
+   // Handle midi input 
 
-    offTone(i);
-  }
- 
+  updateServoState();
 }      
 
 void attachAndWrite(int index, int angle){
@@ -114,17 +102,25 @@ int checkServoActivationTimer(){
 }
 
 
-// void updateServoState(){
-  
-//   unsigned long currentMillis = millis();
+void updateServoState(){
+  unsigned long currentMillis = millis();
+  int timeDiff;
+   for(int i = 0; i < SERVOS; i++) {
+     
+    if(servoActivationTimer[i] == 0) {
+      continue;
+    }
 
-//   activeServos
-//   for (int i=0; i<sizeof activeServos/sizeof activeServos[0]; i++) {
-//     if (currentMillis - servoActivationTimer[i] >= toneDuration) {
-
-//     }
-//   }
-// }
+    timeDiff = currentMillis - servoActivationTimer[i]; 
+    if (timeDiff > DETACH_HOLD) {
+      myservo[i].detach();
+      servoActivationTimer[i] = 0;
+    } else if (timeDiff > TONE_HOLD && activeServos[i]) {
+      offTone(i);
+      activeServos[i] = false;
+    }
+  }
+}
 
 void onTone(int index) {
   int angle = 30;
@@ -135,12 +131,9 @@ void onTone(int index) {
   
   attachAndWrite(index, DEFAULT_POS + angle + offset[index]);
   servoActivationTimer[index] = millis();
+  activeServos[index] = true;
 }
 
 void offTone(int index) {
-  // myservo[index].write(DEFAULT_POS +  offset[index]);   
-  
   attachAndWrite(index, DEFAULT_POS + offset[index]);
-  delay(50);
-  myservo[index].detach();
 }
