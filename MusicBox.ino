@@ -1,12 +1,22 @@
-
-#include <Servo.h>
+#include <MIDI.h>
+#include <Servo.h> 
  
+#define RELAY_PIN 52
+
 #define SERVOS 30
 #define DEFAULT_POS 75
 
-#define TONE_HOLD 250
-#define DETACH_HOLD 500
+#define TONE_HOLD 75
+#define DETACH_HOLD 250
  
+ 
+//Create an instance of the library with default name, serial port and settings
+MIDI_CREATE_DEFAULT_INSTANCE();
+
+struct MySettings : public midi::DefaultSettings {
+  static const long BaudRate = 115200;
+};
+
 // Create the servo object to control a servo.
 Servo myservo[SERVOS];  
  
@@ -26,9 +36,9 @@ int servo_pins[SERVOS] = {
 
 // Measured offset based on the spindle position
 int offset[SERVOS] = {
-  4,  2,  8, -4, -2,
-  6,  6,  8,  -8,  8,
-  12, 4, 12, 1, 4,
+  4,  2,  8, -4, 0,
+  6,  6,  10,  -6,  8,
+  12, 4, 14, 3, 6,
 
   // Separation
 
@@ -44,11 +54,19 @@ long servoActivationTimer[SERVOS] = {0};
 
 
 void setup() {
-   
-  Serial.begin(9600);
+  pinMode(RELAY_PIN, OUTPUT);  
 
+  MIDI.begin(MIDI_CHANNEL_OMNI); 
+    
+  // OMNI sets it to listen to all channels.. MIDI.begin(2) would set it 
+  // to respond to notes on channel 2 only.
 
-  setAllToAngle(75);
+  // This command tells the Midi Library which function you want to call when a NOTE ON command
+  // is received. In this case it's "MyHandleNoteOn".
+  MIDI.setHandleNoteOn(MyHandleNoteOn); 
+
+  setAllToAngle(DEFAULT_POS);
+  delay(500);
   for(int i = 0; i < SERVOS; i++) {
     // Attach the servo to the servo object 
     myservo[i].attach(servo_pins[i]);
@@ -60,16 +78,32 @@ void setup() {
     myservo[i].detach();
   }
   delay(500);
+
   
-  Serial.println(" ==== PLAYER READY ====");
+  // digitalWrite(RELAY_PIN, HIGH);
+  
+
 }
   
 void loop() {
-
+  
    // Handle midi input 
-
+  MIDI.read(); // Continuously check if Midi data has been received.
   updateServoState();
 }      
+
+// MyHandleNoteON is the function that will be called by the Midi Library
+// when a MIDI NOTE ON message is received.
+// It will be passed bytes for Channel, Pitch, and Velocity
+void MyHandleNoteOn(byte channel, byte pitch, byte velocity) {
+
+  // C Major, starting at middle C
+  // 60, 62, 64, 65, 67, 69, 71, 72
+
+  int pitchPin = map(pitch, 44, 74, 2, 31);
+  onTone(pitchPin);
+}
+
 
 void attachAndWrite(int index, int angle){
     myservo[index].attach(servo_pins[index]);
@@ -112,7 +146,7 @@ void updateServoState(){
     }
 
     timeDiff = currentMillis - servoActivationTimer[i]; 
-    if (timeDiff > DETACH_HOLD) {
+    if (timeDiff > DETACH_HOLD) { 
       myservo[i].detach();
       servoActivationTimer[i] = 0;
     } else if (timeDiff > TONE_HOLD && activeServos[i]) {
