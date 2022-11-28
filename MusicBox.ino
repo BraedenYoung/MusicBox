@@ -6,6 +6,8 @@
 #define SERVOS 30
 #define DEFAULT_POS 75
 
+#define DEFAULT_OFFSET 20
+
 #define TONE_HOLD 75
 #define DETACH_HOLD 250
  
@@ -36,7 +38,7 @@ int servo_pins[SERVOS] = {
 
 // Measured offset based on the spindle position
 int offset[SERVOS] = {
-  4,  2,  8, -4, 0,
+  2,  2,  8, -8, 0,
   6,  6,  10,  -6,  8,
   12, 4, 14, 3, 6,
 
@@ -65,7 +67,7 @@ void setup() {
   // is received. In this case it's "MyHandleNoteOn".
   MIDI.setHandleNoteOn(MyHandleNoteOn); 
 
-  setAllToAngle(DEFAULT_POS);
+  setAllDefault();
   delay(500);
   for(int i = 0; i < SERVOS; i++) {
     // Attach the servo to the servo object 
@@ -116,9 +118,16 @@ void detachAll() {
   }
 }
 
-void setAllToAngle(int angle) {
+int getDefault(int index) {
+  if (SERVOS/2 <= index) {
+    return DEFAULT_POS + (DEFAULT_OFFSET * -1);
+  }
+  return DEFAULT_POS + DEFAULT_OFFSET;
+}
+
+void setAllDefault() {
    for(int i = 0; i < SERVOS; i++) {
-      myservo[i].write(angle + offset[i]);   
+      myservo[i].write(getDefault(i) + offset[i]);   
     }           
 }
 
@@ -163,11 +172,11 @@ void onTone(int index) {
     angle = angle * -1;
   }
   
-  attachAndWrite(index, DEFAULT_POS + angle + offset[index]);
+  attachAndWrite(index, getDefault(index) + angle + offset[index]);
   servoActivationTimer[index] = millis();
   activeServos[index] = true;
 }
 
 void offTone(int index) {
-  attachAndWrite(index, DEFAULT_POS + offset[index]);
+  attachAndWrite(index, getDefault(index) + offset[index]);
 }
