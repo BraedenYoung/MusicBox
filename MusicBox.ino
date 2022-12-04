@@ -2,15 +2,22 @@
 #include <Servo.h> 
  
 #define RELAY_PIN 52
+#define MOTOR_PIN 45
+#define MOTOR_REVERSE_PIN 44
+#define MOTOR_TRIM_POT_PIN A1
 
 #define SERVOS 30
 #define DEFAULT_POS 75
 
+#define ON_TONE_ANGLE 40
+
 #define DEFAULT_OFFSET 20
 
-#define TONE_HOLD 75
+#define TONE_HOLD 100
 #define DETACH_HOLD 250
  
+#define UPPER_PITCH 90
+#define LOWER_PITCH 60 
  
 //Create an instance of the library with default name, serial port and settings
 MIDI_CREATE_DEFAULT_INSTANCE();
@@ -18,6 +25,10 @@ MIDI_CREATE_DEFAULT_INSTANCE();
 struct MySettings : public midi::DefaultSettings {
   static const long BaudRate = 115200;
 };
+
+int motor_trim_pot = 0;
+int motor_setting = 0;
+
 
 // Create the servo object to control a servo.
 Servo myservo[SERVOS];  
@@ -38,15 +49,15 @@ int servo_pins[SERVOS] = {
 
 // Measured offset based on the spindle position
 int offset[SERVOS] = {
-  2,  2,  8, -8, 0,
-  6,  6,  10,  -6,  8,
-  12, 4, 14, 3, 6,
+  3,  4,  7, -8, 0,
+  7,  7,  10,  -6,  10,
+  13, 4, 14, 3, 6,
 
   // Separation
 
   -14, -8, 12, -12, -4,
   -12, -2, -2, -4, -4, 
-  -10, 2, -2, -2, 6 
+  -10, 2, 0, -2, 6 
 };
 
 bool activeServos[SERVOS] = {false};
@@ -56,7 +67,8 @@ long servoActivationTimer[SERVOS] = {0};
 
 
 void setup() {
-  pinMode(RELAY_PIN, OUTPUT);  
+  pinMode(RELAY_PIN, OUTPUT);    
+
 
   MIDI.begin(MIDI_CHANNEL_OMNI); 
     
@@ -80,15 +92,17 @@ void setup() {
     myservo[i].detach();
   }
   delay(500);
-
-  
-  // digitalWrite(RELAY_PIN, HIGH);
-  
-
 }
   
 void loop() {
+  motor_trim_pot = analogRead(MOTOR_TRIM_POT_PIN);
   
+  // map it to the range of the analog out:
+  motor_setting = map(motor_trim_pot, 0, 1023, 0, 255);
+  
+  digitalWrite(MOTOR_REVERSE_PIN, LOW);
+  analogWrite(MOTOR_PIN, motor_setting);
+
    // Handle midi input 
   MIDI.read(); // Continuously check if Midi data has been received.
   updateServoState();
@@ -102,7 +116,14 @@ void MyHandleNoteOn(byte channel, byte pitch, byte velocity) {
   // C Major, starting at middle C
   // 60, 62, 64, 65, 67, 69, 71, 72
 
-  int pitchPin = map(pitch, 44, 74, 2, 31);
+  // CDGA....CDE
+  //  44, 74 
+
+  if (pitch > UPPER_PITCH || LOWER_PITCH > pitch) {
+    return;
+  }
+
+  int pitchPin = map(pitch, LOWER_PITCH, UPPER_PITCH, 2, 31);
   onTone(pitchPin);
 }
 
@@ -166,7 +187,7 @@ void updateServoState(){
 }
 
 void onTone(int index) {
-  int angle = 30;
+  int angle = ON_TONE_ANGLE;
   // If the pin is over half way reverse the direction
   if (SERVOS/2 <= index) {
     angle = angle * -1;
